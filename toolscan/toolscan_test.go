@@ -63,22 +63,25 @@ func TestRunCppCheck(t *testing.T) {
 
 //=============================================================================
 type runnerDummy struct {
-	output []byte
-	err    error
+	outputCmake    []byte
+	outputCppCheck []byte
+	errCmake       error
+	errCppCheck    error
 }
 
 func (r runnerDummy) RunCmake(args ...string) ([]byte, error) {
-	return r.output, r.err
+	return r.outputCmake, r.errCmake
 }
 
 func (r runnerDummy) RunCppCheck(args ...string) ([]byte, error) {
-	return r.output, r.err
+	return r.outputCppCheck, r.errCppCheck
 }
 
+//=============================================================================
 func TestScanForCmake(t *testing.T) {
 	runner = runnerDummy{
-		output: []byte(actualCmakeResult),
-		err:    nil,
+		outputCmake: []byte(actualCmakeResult),
+		errCmake:    nil,
 	}
 	defer func() { runner = newCommandlineRunner() }()
 	toolInfo := scanForCmake()
@@ -89,8 +92,8 @@ func TestScanForCmake(t *testing.T) {
 func TestScanForCmakeExecutionError(t *testing.T) {
 	expectedError := errors.New("Execution error")
 	runner = runnerDummy{
-		output: nil,
-		err:    expectedError,
+		outputCmake: nil,
+		errCmake:    expectedError,
 	}
 	defer func() { runner = newCommandlineRunner() }()
 	toolInfo := scanForCmake()
@@ -98,10 +101,22 @@ func TestScanForCmakeExecutionError(t *testing.T) {
 	assert.Equal(t, "", toolInfo.Version)
 }
 
+func TestScanForCmakeInvalidToolOutput(t *testing.T) {
+	runner = runnerDummy{
+		outputCmake: []byte("cmake version 3.14.3"),
+		errCmake:    nil,
+	}
+	defer func() { runner = newCommandlineRunner() }()
+	toolInfo := scanForCmake()
+	assert.False(t, toolInfo.Available)
+	assert.Equal(t, "", toolInfo.Version)
+}
+
+//=============================================================================
 func TestScanForCppCheck(t *testing.T) {
 	runner = runnerDummy{
-		output: []byte(actualCppCheckResult),
-		err:    nil,
+		outputCppCheck: []byte(actualCppCheckResult),
+		errCppCheck:    nil,
 	}
 	defer func() { runner = newCommandlineRunner() }()
 	toolInfo := scanForCppCheck()
@@ -112,11 +127,39 @@ func TestScanForCppCheck(t *testing.T) {
 func TestScanForCppCheckExecutionError(t *testing.T) {
 	expectedError := errors.New("Execution error")
 	runner = runnerDummy{
-		output: nil,
-		err:    expectedError,
+		outputCppCheck: nil,
+		errCppCheck:    expectedError,
 	}
 	defer func() { runner = newCommandlineRunner() }()
 	toolInfo := scanForCppCheck()
 	assert.False(t, toolInfo.Available)
 	assert.Equal(t, "", toolInfo.Version)
+}
+
+func TestScanForCppCheckInvalidToolOutput(t *testing.T) {
+	runner = runnerDummy{
+		outputCppCheck: []byte(strings.Trim(actualCppCheckResult, "\n")),
+		errCppCheck:    nil,
+	}
+	defer func() { runner = newCommandlineRunner() }()
+	toolInfo := scanForCppCheck()
+	assert.False(t, toolInfo.Available)
+	assert.Equal(t, "", toolInfo.Version)
+}
+
+//=============================================================================
+func TestScanTools(t *testing.T) {
+	runner = runnerDummy{
+		outputCppCheck: []byte(actualCppCheckResult),
+		errCppCheck:    nil,
+		outputCmake:    []byte(actualCmakeResult),
+		errCmake:       nil,
+	}
+
+	infos, err := ScanTools()
+	assert.Equal(t, nil, err)
+	assert.True(t, infos.CMake.Available)
+	assert.True(t, infos.CppCheck.Available)
+	assert.Equal(t, "3.14.3", infos.CMake.Version)
+	assert.Equal(t, "1.86", infos.CppCheck.Version)
 }
