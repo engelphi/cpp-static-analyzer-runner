@@ -3,16 +3,20 @@ language: go
 matrix:
   include:
     - os: linux
-      go:
-        - 1.10.x
-        - 1.11.x
-        - 1.12.x
+      go: 1.10.x
+      dist: xenial
+    - os: linux
+      go: 1.11.x
+      dist: xenial
+    - os: linux
+      go: 1.12.x
       dist: xenial
     - os: osx
-      go:
-        - 1.10.x
-        - 1.11.x
-        - 1.12.x
+      go: 1.10.x
+    - os: osx
+      go: 1.11.x
+    - os: osx
+      go: 1.12.x
 
 before_install:
   - go get -v golang.org/x/lint/golint
