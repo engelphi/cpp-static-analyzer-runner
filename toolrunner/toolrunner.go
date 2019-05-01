@@ -19,6 +19,7 @@ func (r commandlineRunnerImpl) RunCmake(arg ...string) (out []byte, err error) {
 	return
 }
 
+// RunCppCheck run cppcheck with the given arguments
 func (r commandlineRunnerImpl) RunCppCheck(arg ...string) (out []byte, err error) {
 	cmd := execCommand("cppcheck", arg...)
 	out, err = cmd.CombinedOutput()
