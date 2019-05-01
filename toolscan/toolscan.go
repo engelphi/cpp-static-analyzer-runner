@@ -6,8 +6,11 @@ import (
 	"strings"
 )
 
+var execCommand = exec.Command
+
 type commandlineRunner interface {
 	RunCmake(arg ...string) (out []byte, err error)
+	RunCppCheck(arg ...string) (out []byte, err error)
 }
 
 type commandlineRunnerImpl struct{}
@@ -15,6 +18,12 @@ type commandlineRunnerImpl struct{}
 // RunCmake runs cmake with the given arguments and returns the output
 func (r commandlineRunnerImpl) RunCmake(arg ...string) (out []byte, err error) {
 	cmd := execCommand("cmake", arg...)
+	out, err = cmd.CombinedOutput()
+	return
+}
+
+func (r commandlineRunnerImpl) RunCppCheck(arg ...string) (out []byte, err error) {
+	cmd := execCommand("cppcheck", arg...)
 	out, err = cmd.CombinedOutput()
 	return
 }
@@ -33,18 +42,16 @@ type ToolInfo struct {
 
 // ScanResult contains the result of a tool scan
 type ScanResult struct {
-	CMake ToolInfo
+	CMake    ToolInfo
+	CppCheck ToolInfo
 }
 
-var execCommand = exec.Command
-
-func scanForCmake() ToolInfo {
-	var info ToolInfo
+func scanForCmake() (info ToolInfo) {
 	out, err := runner.RunCmake("--version")
 	if err != nil {
 		info.Available = false
 		info.Version = ""
-		return info
+		return
 	}
 
 	var buf = bytes.NewBuffer(out)
@@ -52,18 +59,40 @@ func scanForCmake() ToolInfo {
 	if err != nil {
 		info.Available = false
 		info.Version = ""
-		return info
+		return
 	}
 
 	words := strings.Split(line, " ")
 	info.Available = true
 	info.Version = strings.Trim(words[len(words)-1], "\n")
-	return info
+	return
+}
+
+func scanForCppCheck() (info ToolInfo) {
+	out, err := runner.RunCppCheck("--version")
+	if err != nil {
+		info.Available = false
+		info.Version = ""
+		return
+	}
+
+	var buf = bytes.NewBuffer(out)
+	line, err := buf.ReadString('\n')
+	if err != nil {
+		info.Available = false
+		info.Version = ""
+		return
+	}
+
+	words := strings.Split(line, " ")
+	info.Available = true
+	info.Version = strings.Trim(words[len(words)-1], "\n")
+	return
 }
 
 // ScanTools scans for the available tools
-func ScanTools() (ScanResult, error) {
-	var tools ScanResult
+func ScanTools() (tools ScanResult, err error) {
 	tools.CMake = scanForCmake()
+	tools.CppCheck = scanForCppCheck()
 	return tools, nil
 }
