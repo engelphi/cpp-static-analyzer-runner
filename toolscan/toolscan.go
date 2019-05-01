@@ -2,37 +2,12 @@ package toolscan
 
 import (
 	"bytes"
-	"os/exec"
 	"strings"
+
+	"github.com/engelphi/cpp-static-analyzer-runner/toolrunner"
 )
 
-var execCommand = exec.Command
-
-type commandlineRunner interface {
-	RunCmake(arg ...string) (out []byte, err error)
-	RunCppCheck(arg ...string) (out []byte, err error)
-}
-
-type commandlineRunnerImpl struct{}
-
-// RunCmake runs cmake with the given arguments and returns the output
-func (r commandlineRunnerImpl) RunCmake(arg ...string) (out []byte, err error) {
-	cmd := execCommand("cmake", arg...)
-	out, err = cmd.CombinedOutput()
-	return
-}
-
-func (r commandlineRunnerImpl) RunCppCheck(arg ...string) (out []byte, err error) {
-	cmd := execCommand("cppcheck", arg...)
-	out, err = cmd.CombinedOutput()
-	return
-}
-
-func newCommandlineRunner() commandlineRunner {
-	return commandlineRunnerImpl{}
-}
-
-var runner = newCommandlineRunner()
+var runner = toolrunner.NewCommandlineRunner()
 
 // ToolInfo contains information about a tool
 type ToolInfo struct {
