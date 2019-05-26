@@ -23,7 +23,7 @@ before_install:
 
 script:
   - ./lint-unix.sh
-  - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+  - go test -race -coverprofile=coverage.txt -covermode=atomic -tags="all integration" ./...
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
