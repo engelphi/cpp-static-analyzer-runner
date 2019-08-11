@@ -20,6 +20,7 @@ matrix:
 
 before_install:
   - go get -v golang.org/x/lint/golint
+  - go get -v github.com/udhos/equalfile
 
 script:
   - ./lint-unix.sh
