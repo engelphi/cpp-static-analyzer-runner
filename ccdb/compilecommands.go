@@ -1,7 +1,8 @@
-package compilecommandsdb
+package ccdb
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -15,9 +16,45 @@ type CompileCommand struct {
 	File      string `json:"file"`
 }
 
+type fileValidator interface {
+	IsValidFile(filename string) bool
+	IsValidDirectory(directoryPath string) bool
+}
+
+type fileValidatorImpl struct {
+}
+
+func (f fileValidatorImpl) IsValidFile(filename string) bool {
+	fileInfo, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	if mode := fileInfo.Mode(); !mode.IsRegular() {
+		return false
+	}
+
+	return true
+}
+
+func (f fileValidatorImpl) IsValidDirectory(directoryPath string) bool {
+	fileInfo, err := os.Stat(directoryPath)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	if mode := fileInfo.Mode(); !mode.IsDir() {
+		return false
+	}
+
+	return true
+}
+
+var validator fileValidator = fileValidatorImpl{}
+
 // CompileCommandsDB interface for interacting with compile_commands.json
 type CompileCommandsDB interface {
-	Filter(directory string) CompileCommandsDB
+	Filter(directory string) (CompileCommandsDB, error)
 }
 
 // CompileCommands Represents the contents of a compile_commands.json
@@ -26,7 +63,11 @@ type CompileCommands struct {
 }
 
 // Filter filters out commands on files that start are situated in the given directory
-func (c CompileCommands) Filter(directory string) CompileCommandsDB {
+func (c CompileCommands) Filter(directory string) (CompileCommandsDB, error) {
+	if !validator.IsValidDirectory(directory) {
+		return CompileCommands{}, fmt.Errorf("Invalid directory path")
+	}
+
 	var filteredCommands CompileCommands
 
 	for _, command := range c.Commands {
@@ -35,11 +76,15 @@ func (c CompileCommands) Filter(directory string) CompileCommandsDB {
 		}
 	}
 
-	return filteredCommands
+	return filteredCommands, nil
 }
 
 // LoadCompileCommands loads compile commands from a given file. Returns an error if it fails to load the commands
 func LoadCompileCommands(filename string) (CompileCommandsDB, error) {
+	if !validator.IsValidFile(filename) {
+		return CompileCommands{}, fmt.Errorf("Invalid path to compile commands database")
+	}
+
 	file, err := os.Open(filename)
 	defer file.Close()
 	if err != nil {

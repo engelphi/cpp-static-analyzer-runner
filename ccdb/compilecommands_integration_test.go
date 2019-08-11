@@ -1,6 +1,6 @@
 // +build integration
 
-package compilecommandsdb
+package ccdb
 
 import (
 	"testing"
