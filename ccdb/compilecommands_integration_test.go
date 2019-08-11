@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoadCompileCommands(t *testing.T) {
-	var path string = "./compile_commands.json"
+	var path string = "./testdata/compile_commands.json"
 	expected := CompileCommands{
 		Commands: []CompileCommand{
 			{
@@ -31,13 +31,13 @@ func TestLoadCompileCommands(t *testing.T) {
 }
 
 func TestLoadCompileCommandsFailsWithNonExistingFile(t *testing.T) {
-	var path string = "./test.json"
+	var path string = "./notexistent.json"
 	_, err := LoadCompileCommands(path)
 	assert.NotNil(t, err)
 }
 
 func TestLoadCompileCommandsFailsWhenMalformedContentIsDiscovered(t *testing.T) {
-	var path string = "./compile_commands.json.malformed"
+	var path string = "./testdata/compile_commands.json.malformed"
 	_, err := LoadCompileCommands(path)
 	assert.NotNil(t, err)
 }
