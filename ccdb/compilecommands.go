@@ -54,7 +54,9 @@ var validator fileValidator = fileValidatorImpl{}
 
 // CompileCommandsDB interface for interacting with compile_commands.json
 type CompileCommandsDB interface {
-	Filter(directory string) (CompileCommandsDB, error)
+	LoadCompileCommands(filename string) error
+	Filter(directory string) error
+	WriteCompileCommands(filename string) error
 }
 
 // CompileCommands Represents the contents of a compile_commands.json
@@ -62,67 +64,83 @@ type CompileCommands struct {
 	Commands []CompileCommand
 }
 
+// NewCompileCommandsDB Creates a new CompileCommandsDB
+func NewCompileCommandsDB() CompileCommandsDB {
+	return &CompileCommands{}
+}
+
 // Filter filters out commands on files that start are situated in the given directory
-func (c CompileCommands) Filter(directory string) (CompileCommandsDB, error) {
+func (c *CompileCommands) Filter(directory string) error {
 	if !validator.IsValidDirectory(directory) {
-		return CompileCommands{}, fmt.Errorf("Invalid directory path")
+		return fmt.Errorf("Invalid directory path")
 	}
 
-	var filteredCommands CompileCommands
+	var filteredCommands []CompileCommand
 
 	for _, command := range c.Commands {
 		if !strings.HasPrefix(command.File, directory) {
-			filteredCommands.Commands = append(filteredCommands.Commands, command)
+			filteredCommands = append(filteredCommands, command)
 		}
 	}
 
-	return filteredCommands, nil
+	c.Commands = filteredCommands
+	return nil
 }
 
 // LoadCompileCommands loads compile commands from a given file. Returns an error if it fails to load the commands
-func LoadCompileCommands(filename string) (CompileCommandsDB, error) {
+func (c *CompileCommands) LoadCompileCommands(filename string) error {
 	if !validator.IsValidFile(filename) {
-		return CompileCommands{}, fmt.Errorf("Invalid path to compile commands database")
+		return fmt.Errorf("Invalid path to compile commands database")
 	}
 
 	file, err := os.Open(filename)
 	defer file.Close()
 	if err != nil {
 		log.Println("Failed to open compile commands file")
-		return CompileCommands{}, err
+		return err
 	}
 
-	commands, err := ParseCompileCommands(file)
+	commands, err := parseCompileCommands(file)
 	if err != nil {
 		log.Println("Failed to load compile commands")
-		return CompileCommands{}, err
+		return err
 	}
 
-	return commands, nil
+	c.Commands = commands
+	return nil
 }
 
 // ParseCompileCommands parses compile commands from the given reader
-func ParseCompileCommands(r io.Reader) (CompileCommands, error) {
-	var compileCommands CompileCommands
+func parseCompileCommands(r io.Reader) ([]CompileCommand, error) {
+	var compileCommands []CompileCommand
 	dec := json.NewDecoder(r)
 
-	if err := dec.Decode(&compileCommands.Commands); err != nil {
+	if err := dec.Decode(&compileCommands); err != nil {
 		log.Println("Failed to parse compile commands")
-		return CompileCommands{}, err
+		return []CompileCommand{}, err
 	}
 
 	return compileCommands, nil
 }
 
 // WriteCompileCommands writes the compile commands database
-func WriteCompileCommands(w io.Writer, commands CompileCommands) error {
-	enc := json.NewEncoder(w)
+func (c *CompileCommands) WriteCompileCommands(filename string) error {
+	outputFile, err := os.Create(filename)
+	if err != nil {
+		log.Println("Failed to create output file")
+		return err
+	}
+	defer outputFile.Close()
+
+	enc := json.NewEncoder(outputFile)
 	enc.SetIndent("", "\t")
 
-	if err := enc.Encode(&commands.Commands); err != nil {
+	if err := enc.Encode(&c.Commands); err != nil {
 		log.Println("Failed to serialize compile commands")
 		return err
 	}
+
+	outputFile.Sync()
 
 	return nil
 }
