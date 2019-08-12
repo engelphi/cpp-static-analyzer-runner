@@ -2,26 +2,14 @@ package ccdb
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-type fileValidatorMock struct {
-	ExpectedValidFileReturn      bool
-	ExpectedValidDirectoryReturn bool
-}
-
-func (f fileValidatorMock) IsValidFile(filename string) bool {
-	return f.ExpectedValidFileReturn
-}
-
-func (f fileValidatorMock) IsValidDirectory(directoryPath string) bool {
-	return f.ExpectedValidDirectoryReturn
-}
-
 // =================================================================================================
-var testCommands = []byte(`[
+var testCommands = string(`[
 	{
 		"directory": "/home/pen/Project/algorithm/build",
 		"command": "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/intersperse.cpp.o -c /home/pen/Project/algorithm/test/intersperse.cpp",
@@ -35,42 +23,16 @@ var testCommands = []byte(`[
 ]
 `)
 
-// =================================================================================================
-func TestParseCompileCommands(t *testing.T) {
-	testCommandReader := bytes.NewReader(testCommands)
-
-	expected := []CompileCommand{
-		{
-			Directory: "/home/pen/Project/algorithm/build",
-			Command:   "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/intersperse.cpp.o -c /home/pen/Project/algorithm/test/intersperse.cpp",
-			File:      "/home/pen/Project/algorithm/test/intersperse.cpp",
-		},
-		{
-			Directory: "/home/pen/Project/algorithm/build",
-			Command:   "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/main.cpp.o -c /home/pen/Project/algorithm/test/main.cpp",
-			File:      "/home/pen/Project/algorithm/test/main.cpp",
-		},
-	}
-
-	commands, err := parseCompileCommands(testCommandReader)
-	assert.Nil(t, err)
-	assert.Equal(t, expected, commands)
-}
-
-func TestParseCompileCommandsFailsIfEmpty(t *testing.T) {
-	testCommandReader := bytes.NewReader([]byte(""))
-	_, err := parseCompileCommands(testCommandReader)
-	assert.NotNil(t, err)
-}
+var testCommandsMalformed = string(`[
+	{
+		"directory": "/home/pen/Project/algorithm/build",
+		"command": "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/intersperse.cpp.o -c /home/pen/Project/algorithm/test/intersperse.cpp",
+		"fil
+]`)
 
 // =================================================================================================
 
 func TestFilter(t *testing.T) {
-	validator = fileValidatorMock{
-		ExpectedValidDirectoryReturn: true,
-		ExpectedValidFileReturn:      false,
-	}
-	defer func() { validator = fileValidatorImpl{} }()
 	input := CompileCommands{
 		Commands: []CompileCommand{
 			{
@@ -101,12 +63,35 @@ func TestFilter(t *testing.T) {
 	assert.Equal(t, expected, input)
 }
 
-func TestFilterFailsIfInvalidDirectoryIsGiven(t *testing.T) {
-	validator = fileValidatorMock{
-		ExpectedValidDirectoryReturn: false,
-		ExpectedValidFileReturn:      false,
+func TestLoadCompileCommands(t *testing.T) {
+	ccdb := NewCompileCommandsDB()
+	expected := CompileCommands{
+		Commands: []CompileCommand{
+			{
+				Directory: "/home/pen/Project/algorithm/build",
+				Command:   "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/intersperse.cpp.o -c /home/pen/Project/algorithm/test/intersperse.cpp",
+				File:      "/home/pen/Project/algorithm/test/intersperse.cpp",
+			},
+			{
+				Directory: "/home/pen/Project/algorithm/build",
+				Command:   "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/main.cpp.o -c /home/pen/Project/algorithm/test/main.cpp",
+				File:      "/home/pen/Project/algorithm/test/main.cpp",
+			},
+		},
 	}
-	defer func() { validator = fileValidatorImpl{} }()
+
+	err := ccdb.LoadCompileCommands(strings.NewReader(testCommands))
+	assert.Nil(t, err)
+	assert.Equal(t, &expected, ccdb)
+}
+
+func TestLoadCompileCommandsFailsWhenMalformedContentIsDiscovered(t *testing.T) {
+	ccdb := NewCompileCommandsDB()
+	err := ccdb.LoadCompileCommands(strings.NewReader(testCommandsMalformed))
+	assert.NotNil(t, err)
+}
+
+func TestWriteCompileCommands(t *testing.T) {
 	input := CompileCommands{
 		Commands: []CompileCommand{
 			{
@@ -117,11 +102,13 @@ func TestFilterFailsIfInvalidDirectoryIsGiven(t *testing.T) {
 			{
 				Directory: "/home/pen/Project/algorithm/build",
 				Command:   "/usr/bin/c++   -I/home/pen/Project/algorithm/algorithms -I/home/pen/Project/algorithm/catch   -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2   -std=c++17 -o CMakeFiles/test-algorithm.dir/test/main.cpp.o -c /home/pen/Project/algorithm/test/main.cpp",
-				File:      "/home/pen/Project/algorithm/test2/main.cpp",
+				File:      "/home/pen/Project/algorithm/test/main.cpp",
 			},
 		},
 	}
 
-	err := input.Filter("/home/pen/Project/algorithm/test2/")
-	assert.NotNil(t, err)
+	var buf bytes.Buffer
+	err := input.WriteCompileCommands(&buf)
+	assert.Nil(t, err)
+	assert.Equal(t, testCommands, buf.String())
 }
